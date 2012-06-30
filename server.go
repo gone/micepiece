@@ -111,13 +111,6 @@ func (c *connection) reader() {
 	c.wsock.Close()
 }
 
-func parseMessage(message string) coord {
-	s := strings.Split(message, ":")
-	x, _ := strconv.Atoi(s[0])
-	y, _ := strconv.Atoi(s[1])
-	return coord{X: x, Y: y}
-}
-
 func (c *connection) writer() {
 	for message := range c.send {
 		err := websocket.Message.Send(c.wsock, string(message))
