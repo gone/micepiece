@@ -89,9 +89,9 @@ func (h *hub) update(c *connection, coords coord) {
 
 func mousemove(c *connection, data interface{}) {
 	d := data.(map[string]interface{})
-	x, _ := d["x"].(float64)
-	y, _ := d["y"].(float64)
-	h.update(c, coord{X: int(x), Y: int(y)})
+	x, _ := d["x"].(int)
+	y, _ := d["y"].(int)
+	h.update(c, coord{X: x, Y: y})
 
 }
 
