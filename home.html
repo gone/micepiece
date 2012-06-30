@@ -1,0 +1,92 @@
+<html>
+  <head>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+    <script src="http://d3js.org/d3.v2.js"></script>
+    <script type="text/javascript">
+
+
+var ws = function(url){
+  var conn = new WebSocket(url);
+
+  var callbacks = {};
+
+  this.bind = function(event_name, callback){
+    callbacks[event_name] = callbacks[event_name] || [];
+    callbacks[event_name].push(callback);
+    return this;
+  };
+
+  this.send = function(event_name, event_data){
+    var payload = JSON.stringify({event:event_name, data: event_data});
+    conn.send( payload );
+    return this;
+  };
+
+  conn.onmessage = function(evt){
+    var json = JSON.parse(evt.data)
+    dispatch(json.Event, json.Data)
+  };
+
+  conn.onclose = function(){dispatch('close',null)}
+  conn.onopen = function(){dispatch('open',null)}
+
+  var dispatch = function(event_name, message){
+    var chain = callbacks[event_name];
+    if(typeof chain == 'undefined') return;
+    for(var i = 0; i < chain.length; i++){
+      chain[i]( message )
+    }
+  }
+};
+
+$(function(){
+  svg = d3.select("body")
+    .append("svg")
+    .attr('height', document.offsetHeight)
+    .attr("width", document.offsetWidth)
+
+
+  var conn;
+
+  function onclose(message){
+    console.log("onclose" + message)
+  }
+
+  function update(message){
+    svg.selectAll("circle").remove()
+    svg.selectAll("circle").data(message)
+      .enter()
+      .append("circle")
+      .attr("cy", function(d, i){
+        return d['Y']
+      })
+      .attr("cx", function(d, i){
+        return d["X"]
+      })
+      .attr("r", 5)
+  }
+  function setup(message){
+    $("body").mousemove(function(event){
+      conn.send("mousemove", {'x':event.pageX, 'y':event.pageY});
+    })
+  }
+
+
+
+
+  if (window["WebSocket"]) {
+    conn = new ws("ws://{{$}}/ws")
+    conn.bind('close', onclose)
+    conn.bind('update', update)
+    conn.bind("open", setup)
+
+  }}
+
+     );
+</script>
+<style type="text/css">
+</style>
+</head>
+<body>
+</body>
+</html>
