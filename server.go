@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
-	"strings"
 	"text/template"
 	"time"
 )
+
+const (
+	MAX_PER_HUB int = 200
+	)
 
 type jsonRPC func(*connection, interface{})
 
@@ -26,6 +28,7 @@ type message struct {
 type connection struct {
 	wsock *websocket.Conn
 	send  chan []byte
+	hub *hub
 }
 
 type hub struct {
@@ -38,13 +41,18 @@ type hub struct {
 	unregister chan *connection
 }
 
-var h = hub{
-	connections: make(map[*connection]coord),
-	input:       make(chan string),
-	unregister:  make(chan *connection),
-	register:    make(chan *connection),
-}
+var hubs []*hub = make([]*hub, 0)
 
+func makeHub() *hub{
+	h := hub{
+		connections: make(map[*connection]coord),
+		input:       make(chan string),
+		unregister:  make(chan *connection),
+		register:    make(chan *connection),
+	}
+	go h.run()
+	return &h
+}
 func (h *hub) updateClients() {
 	coords := make([]coord, 0, len(h.connections))
 	for _, v := range h.connections {
@@ -89,15 +97,15 @@ func (h *hub) update(c *connection, coords coord) {
 
 func mousemove(c *connection, data interface{}) {
 	d := data.(map[string]interface{})
-	x, _ := d["x"].(int)
-	y, _ := d["y"].(int)
-	h.update(c, coord{X: x, Y: y})
-
+	x, _ := d["x"].(float64)
+	y, _ := d["y"].(float64)
+	c.hub.update(c, coord{X: int(x), Y: int(y)})
 }
 
 var events = map[string]jsonRPC{"mousemove": mousemove}
 
 func (c *connection) reader() {
+
 	for {
 		var m message
 		err := websocket.JSON.Receive(c.wsock, &m)
@@ -128,8 +136,23 @@ func Handler(wsock *websocket.Conn) {
 		send:  make(chan []byte, 256),
 		wsock: wsock,
 	}
-	h.register <- c
-	defer func() { h.unregister <- c }()
+	//loop through hubs until you find one w/ less than max_per_hub
+	var thehub *hub
+	for _, h := range hubs {
+		// this is a race condition - could try to put connecton on hub at the same time
+		// as another handler is doing so. probably need to mutex the channel send/recv? How do I do that?
+		if len(h.connections) < MAX_PER_HUB {
+			thehub = h
+		}
+	}
+	//all full
+	if thehub == nil {
+		thehub = makeHub()
+		hubs = append(hubs, thehub)
+	}
+	thehub.register <- c
+	c.hub = thehub
+	defer func(){thehub.unregister <- c}()
 	go c.writer()
 	c.reader()
 
@@ -142,7 +165,6 @@ func homeHandler(c http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	go h.run()
 	http.HandleFunc("/", homeHandler)
 	http.Handle("/ws", websocket.Handler(Handler))
 	http.ListenAndServe("127.0.0.1:8080", nil)
