@@ -64,14 +64,13 @@ $(function(){
         return d["X"]
       })
       .attr("r", 5)
+      .exit()
   }
   function setup(message){
     $("body").mousemove(function(event){
       conn.send("mousemove", {'x':event.pageX, 'y':event.pageY});
     })
   }
-
-
 
 
   if (window["WebSocket"]) {
