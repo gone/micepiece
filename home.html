@@ -4,7 +4,8 @@
     <script src="http://d3js.org/d3.v2.js"></script>
     <script type="text/javascript">
 
-
+var conn;
+var color = "#FFFFFF";
 var ws = function(url){
   var conn = new WebSocket(url);
 
@@ -39,14 +40,30 @@ var ws = function(url){
   }
 };
 
+
+function setup_color_blocks(){
+  data = ["#FF0000", "#00FF00", "#0000FF"]
+
+  d3.select("svg")
+    .selectAll("rect")
+    .data(data)
+    .enter()
+    .append("rect")
+    .attr("width", 20)
+    .attr("height", 20)
+    .attr("fill", function(d){return d})
+    .attr("fill-opacity", .5)
+    .attr("x", 20)
+    .attr("y", function(d, i) {return (i *30) + 200})
+    .on("mouseover", function(d){color = d;})
+}
+
 $(function(){
   svg = d3.select("body")
     .append("svg")
     .attr('height', document.offsetHeight)
     .attr("width", document.offsetWidth)
 
-
-  var conn;
 
   function onclose(message){
     console.log("onclose" + message)
@@ -63,13 +80,19 @@ $(function(){
       .attr("cx", function(d, i){
         return d["X"]
       })
-      .attr("r", 5)
-      .exit()
+      .attr("r", 10)
+      .attr("fill", function(d){return d['Color']})
+      .attr("fill-opacity", .5)
   }
-  function setup(message){
+
+function setup(message){
     $("body").mousemove(function(event){
-      conn.send("mousemove", {'x':event.pageX, 'y':event.pageY});
+      conn.send("mousemove", {'x':event.pageX,
+                              'y':event.pageY,
+                              'color':color,
+                             });
     })
+    setup_color_blocks()
   }
 
 

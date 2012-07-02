@@ -15,9 +15,10 @@ const (
 
 type jsonRPC func(*connection, interface{})
 
-type coord struct {
+type PlayerData struct {
 	X int
 	Y int
+	Color string
 }
 
 type message struct {
@@ -32,7 +33,7 @@ type connection struct {
 }
 
 type hub struct {
-	connections map[*connection]coord
+	connections map[*connection]PlayerData
 
 	input chan string
 
@@ -45,7 +46,7 @@ var hubs []*hub = make([]*hub, 0)
 
 func makeHub() *hub{
 	h := hub{
-		connections: make(map[*connection]coord),
+		connections: make(map[*connection]PlayerData),
 		input:       make(chan string),
 		unregister:  make(chan *connection),
 		register:    make(chan *connection),
@@ -54,7 +55,7 @@ func makeHub() *hub{
 	return &h
 }
 func (h *hub) updateClients() {
-	coords := make([]coord, 0, len(h.connections))
+	coords := make([]PlayerData, 0, len(h.connections))
 	for _, v := range h.connections {
 		coords = append(coords, v)
 	}
@@ -80,7 +81,7 @@ func (h *hub) run() {
 	for {
 		select {
 		case c := <-h.register:
-			h.connections[c] = coord{X: 0, Y: 0}
+			h.connections[c] = PlayerData{X: 0, Y: 0}
 
 		case c := <-h.unregister:
 			delete(h.connections, c)
@@ -91,18 +92,31 @@ func (h *hub) run() {
 	}
 }
 
-func (h *hub) update(c *connection, coords coord) {
+func (h *hub) update(c *connection, coords PlayerData) {
 	h.connections[c] = coords
+}
+
+func (h *hub) changecolor(c *connection, color string) {
+	playerData := h.connections[c]
+	playerData.Color = color
 }
 
 func mousemove(c *connection, data interface{}) {
 	d := data.(map[string]interface{})
 	x, _ := d["x"].(float64)
 	y, _ := d["y"].(float64)
-	c.hub.update(c, coord{X: int(x), Y: int(y)})
+	color, _ := d["color"].(string)
+	c.hub.update(c, PlayerData{
+		X: int(x),
+		Y: int(y),
+		Color: color,
+	})
 }
 
-var events = map[string]jsonRPC{"mousemove": mousemove}
+
+var events = map[string]jsonRPC{
+	"mousemove": mousemove,
+}
 
 func (c *connection) reader() {
 
