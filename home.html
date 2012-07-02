@@ -6,6 +6,7 @@
 
 var conn;
 var color = "#FFFFFF";
+var points = 0;
 var ws = function(url){
   var conn = new WebSocket(url);
 
@@ -58,48 +59,91 @@ function setup_color_blocks(){
     .on("mouseover", function(d){color = d;})
 }
 
+
+function onclose(message){
+  console.log("onclose" + message)
+}
+
+function update(message){
+  svg.selectAll("circle").remove()
+  svg.selectAll("circle").data(message)
+    .enter()
+    .append("circle")
+    .attr("cy", function(d, i){
+      return d['Y']
+    })
+    .attr("cx", function(d, i){
+      return d["X"]
+    })
+    .attr("r", 10)
+    .attr("fill", function(d){return d['Color']})
+    .attr("fill-opacity", .5)
+}
+
+function newRound(message){
+  svg.selectAll("path").remove()
+  svg.selectAll("path")
+    .data(message)
+    .enter()
+    .append("svg:path")
+    .attr("transform", function(d) { return "translate(" + d['X'] + "," + d['Y'] + ")"; })
+    .attr("d", d3.svg.symbol()
+          .size(150)
+          .type("triangle-down"))
+    .style("fill", function(d){
+      return d['Color']
+    })
+    .style("stroke", "white")
+    .style("stroke-width", "1.5px")
+    .attr("id", function(d) {return d['X'] + ":" + d['Y']})// hack hooo
+    .on("mouseover", touchPoint)
+}
+
+function setup(message){
+  $("body").mousemove(function(event){
+    conn.send("mousemove", {'x':event.pageX,
+                            'y':event.pageY,
+                            'color':color,
+                           });
+  })
+  setup_color_blocks()
+}
+
+function display_point(text){
+  //display +1 or something here
+}
+
+function removeTriangle(message) {
+  var x = message['X'], y  = message['Y']
+  d3.selectAll('path').filter(function(d){
+    return x == d['X'] && y == d['Y']
+  }).remove()
+}
+
+function touchPoint(d){
+  if (color == d['Color']) {
+    display_point("+1")
+    points++
+  }
+  else {
+    display_point("-1")
+    points--
+  }
+  conn.send("removeTriangle", {'x':d['X'], 'y':d['Y']})
+}
+
 $(function(){
   svg = d3.select("body")
     .append("svg")
     .attr('height', document.offsetHeight)
     .attr("width", document.offsetWidth)
 
-
-  function onclose(message){
-    console.log("onclose" + message)
-  }
-
-  function update(message){
-    svg.selectAll("circle").remove()
-    svg.selectAll("circle").data(message)
-      .enter()
-      .append("circle")
-      .attr("cy", function(d, i){
-        return d['Y']
-      })
-      .attr("cx", function(d, i){
-        return d["X"]
-      })
-      .attr("r", 10)
-      .attr("fill", function(d){return d['Color']})
-      .attr("fill-opacity", .5)
-  }
-
-function setup(message){
-    $("body").mousemove(function(event){
-      conn.send("mousemove", {'x':event.pageX,
-                              'y':event.pageY,
-                              'color':color,
-                             });
-    })
-    setup_color_blocks()
-  }
-
-
   if (window["WebSocket"]) {
     conn = new ws("ws://{{$}}/ws")
     conn.bind('close', onclose)
     conn.bind('update', update)
+    conn.bind('newRound', newRound)
+    conn.bind('removeTriangle', removeTriangle)
     conn.bind("open", setup)
 
   }}

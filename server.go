@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"text/template"
 	"time"
+	"math/rand"
 )
 
 const (
 	MAX_PER_HUB int = 200
-	)
+)
+
 
 type jsonRPC func(*connection, interface{})
 
@@ -41,6 +43,8 @@ type hub struct {
 
 	unregister chan *connection
 }
+
+var COLORS [3]string = [3]string{"#FF0000", "#00FF00", "#0000FF"}
 
 var hubs []*hub = make([]*hub, 0)
 
@@ -78,6 +82,14 @@ func (h *hub) run() {
 			timeout <- true
 		}
 	}()
+	newround := make(chan bool, 1)
+	go func() {
+		for {
+			sleep_time := time.Duration(5)
+			time.Sleep(sleep_time * time.Second)
+			newround <- true
+		}
+	}()
 	for {
 		select {
 		case c := <-h.register:
@@ -88,6 +100,9 @@ func (h *hub) run() {
 
 		case <-timeout:
 			go h.updateClients()
+
+		case <-newround:
+			go h.newRound()
 		}
 	}
 }
@@ -96,12 +111,37 @@ func (h *hub) update(c *connection, coords PlayerData) {
 	h.connections[c] = coords
 }
 
-func (h *hub) changecolor(c *connection, color string) {
-	playerData := h.connections[c]
-	playerData.Color = color
+func (h *hub) newRound(){
+ 	var points = make([]PlayerData, 0)
+ 	for i := 0; i < 11; i++ {
+		x, y := rand.Intn(1000),  rand.Intn(1000)
+		c  := rand.Intn(len(COLORS))
+		points = append(points, PlayerData{X:x, Y:y, Color:COLORS[c]})
+ 	}
+	json_message, err := json.Marshal(message{"newRound", points})
+	if err != nil {
+		fmt.Println("newRound")
+		fmt.Println(err)
+	}
+	for c := range h.connections {
+		c.send <- json_message
+	}
 }
 
-func mousemove(c *connection, data interface{}) {
+
+func (h *hub) removeTriangle(x, y int){
+	triangle_to_remove := PlayerData{X:x, Y:y}
+	json_message, err := json.Marshal(message{"removeTriangle", triangle_to_remove})
+	if err != nil {
+		fmt.Println("removeTriangle")
+		fmt.Println(err)
+	}
+	for c := range h.connections {
+		c.send <- json_message
+	}
+}
+
+func mouseMove(c *connection, data interface{}) {
 	d := data.(map[string]interface{})
 	x, _ := d["x"].(float64)
 	y, _ := d["y"].(float64)
@@ -113,10 +153,20 @@ func mousemove(c *connection, data interface{}) {
 	})
 }
 
+func removeTriangle(c *connection, data interface{}) {
+	d := data.(map[string]interface{})
+	x, _ := d["x"].(float64)
+	y, _ := d["y"].(float64)
+		c.hub.removeTriangle(int(x), int(y))
+}
+
 
 var events = map[string]jsonRPC{
-	"mousemove": mousemove,
+	"mousemove": mouseMove,
+	"removeTriangle": removeTriangle,
 }
+
+
 
 func (c *connection) reader() {
 
@@ -179,6 +229,9 @@ func homeHandler(c http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
+	var now time.Time = time.Now()
+	rand.Seed(now.Unix())
+
 	http.HandleFunc("/", homeHandler)
 	http.Handle("/ws", websocket.Handler(Handler))
 	http.ListenAndServe("127.0.0.1:8080", nil)
