@@ -5,7 +5,7 @@
     <script type="text/javascript">
 
 var conn;
-var color = "#FFFFFF";
+var color = "#000000";
 var points = 0;
 var ws = function(url){
   var conn = new WebSocket(url);
@@ -109,10 +109,6 @@ function setup(message){
   setup_color_blocks()
 }
 
-function display_point(text){
-  //display +1 or something here
-}
-
 function removeTriangle(message) {
   var x = message['X'], y  = message['Y']
   d3.selectAll('path').filter(function(d){
@@ -122,14 +118,18 @@ function removeTriangle(message) {
 
 function touchPoint(d){
   if (color == d['Color']) {
-    display_point("+1")
     points++
   }
   else {
-    display_point("-1")
     points--
   }
+  updatePoints()
   conn.send("removeTriangle", {'x':d['X'], 'y':d['Y']})
+}
+
+function updatePoints(){
+  svg.selectAll("text").remove()
+  svg.append("text").attr('x',20).attr('y',20).text(points)
 }
 
 $(function(){

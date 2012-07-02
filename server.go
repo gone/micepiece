@@ -113,7 +113,7 @@ func (h *hub) update(c *connection, coords PlayerData) {
 
 func (h *hub) newRound(){
  	var points = make([]PlayerData, 0)
- 	for i := 0; i < 11; i++ {
+ 	for i := 0; i < 101; i++ {
 		x, y := rand.Intn(1000),  rand.Intn(1000)
 		c  := rand.Intn(len(COLORS))
 		points = append(points, PlayerData{X:x, Y:y, Color:COLORS[c]})
