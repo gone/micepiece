@@ -204,7 +204,7 @@ func Handler(wsock *websocket.Conn) {
 	var thehub *hub
 	for _, h := range hubs {
 		// this is a race condition - could try to put connecton on hub at the same time
-		// as another handler is doing so. probably need to mutex the channel send/recv? How do I do that?
+		// as another handler is doing so. probably need to mutex the channel send/recv?
 		if len(h.connections) < MAX_PER_HUB {
 			thehub = h
 		}
